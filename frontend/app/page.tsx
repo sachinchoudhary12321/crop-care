@@ -27,7 +27,13 @@ export default function Home() {
     setSelectedImage(file);
 
     const imageUrl = URL.createObjectURL(file);
-    setPreview(imageUrl);
+    setPreview((oldPreview) => {
+      if (oldPreview) {
+        URL.revokeObjectURL(oldPreview);
+      }
+
+      return imageUrl;
+    });
   };
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -36,6 +42,9 @@ export default function Home() {
     if (file) {
       validateAndSetImage(file);
     }
+
+    // Allows selecting the same file again after changing/removing it.
+    event.target.value = "";
   };
 
   const handleDrop = (event: DragEvent<HTMLDivElement>) => {
@@ -51,7 +60,15 @@ export default function Home() {
 
   const removeImage = () => {
     setSelectedImage(null);
-    setPreview(null);
+
+    setPreview((oldPreview) => {
+      if (oldPreview) {
+        URL.revokeObjectURL(oldPreview);
+      }
+
+      return null;
+    });
+
     setError("");
 
     if (fileInputRef.current) {
@@ -59,8 +76,34 @@ export default function Home() {
     }
   };
 
+  const openFilePicker = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleAnalyze = () => {
+    if (!selectedImage) {
+      setError("Please select a crop image first.");
+      return;
+    }
+
+    alert(
+      "Image is ready for analysis. Backend API integration will be added during the frontend-backend integration sprint."
+    );
+  };
+
   return (
     <main className="min-h-screen bg-[#f7faf5] text-slate-900">
+      {/* Global hidden file input.
+          It stays mounted even after an image is selected,
+          so Change Image continues to work. */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/png,image/jpeg,image/jpg"
+        onChange={handleFileChange}
+        className="hidden"
+      />
+
       {/* Navigation */}
       <nav className="border-b border-green-100 bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-5">
@@ -73,7 +116,10 @@ export default function Home() {
               <h1 className="text-xl font-bold tracking-tight text-green-800">
                 Crop Care
               </h1>
-              <p className="text-xs text-slate-500">Smart crop protection</p>
+
+              <p className="text-xs text-slate-500">
+                Smart crop protection
+              </p>
             </div>
           </div>
 
@@ -81,21 +127,32 @@ export default function Home() {
             <a href="#" className="text-green-700">
               Home
             </a>
-            <a href="#detect" className="text-slate-600 hover:text-green-700">
+
+            <a
+              href="#detect"
+              className="text-slate-600 transition hover:text-green-700"
+            >
               Disease Detection
             </a>
-            <a href="#about" className="text-slate-600 hover:text-green-700">
+
+            <a
+              href="#about"
+              className="text-slate-600 transition hover:text-green-700"
+            >
               About
             </a>
           </div>
 
-          <button className="rounded-lg border border-green-200 px-4 py-2 text-sm font-semibold text-green-700 hover:bg-green-50">
+          <button
+            type="button"
+            className="rounded-lg border border-green-200 px-4 py-2 text-sm font-semibold text-green-700 transition hover:bg-green-50"
+          >
             Farmer Login
           </button>
         </div>
       </nav>
 
-      {/* Hero */}
+      {/* Hero Section */}
       <section className="mx-auto grid max-w-7xl items-center gap-12 px-6 py-16 lg:grid-cols-2 lg:py-24">
         <div>
           <div className="mb-5 inline-flex items-center gap-2 rounded-full bg-green-100 px-4 py-2 text-sm font-semibold text-green-800">
@@ -136,7 +193,7 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Hero visual */}
+        {/* Hero Visual */}
         <div className="relative">
           <div className="absolute -inset-6 rounded-[2rem] bg-green-100/70 blur-3xl" />
 
@@ -158,6 +215,7 @@ export default function Home() {
             <div className="mt-6 grid grid-cols-3 gap-3 text-center">
               <div className="rounded-xl bg-slate-50 p-3">
                 <div className="text-xl">📷</div>
+
                 <p className="mt-1 text-xs font-medium text-slate-600">
                   Upload
                 </p>
@@ -165,6 +223,7 @@ export default function Home() {
 
               <div className="rounded-xl bg-slate-50 p-3">
                 <div className="text-xl">🤖</div>
+
                 <p className="mt-1 text-xs font-medium text-slate-600">
                   Analyze
                 </p>
@@ -172,6 +231,7 @@ export default function Home() {
 
               <div className="rounded-xl bg-slate-50 p-3">
                 <div className="text-xl">💡</div>
+
                 <p className="mt-1 text-xs font-medium text-slate-600">
                   Insights
                 </p>
@@ -181,7 +241,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Upload section */}
+      {/* Disease Detection / Upload */}
       <section id="detect" className="bg-white px-6 py-20">
         <div className="mx-auto max-w-4xl">
           <div className="text-center">
@@ -208,21 +268,13 @@ export default function Home() {
                 }}
                 onDragLeave={() => setIsDragging(false)}
                 onDrop={handleDrop}
-                onClick={() => fileInputRef.current?.click()}
+                onClick={openFilePicker}
                 className={`cursor-pointer rounded-3xl border-2 border-dashed p-10 text-center transition md:p-16 ${
                   isDragging
                     ? "border-green-600 bg-green-50"
                     : "border-green-200 bg-green-50/40 hover:border-green-400 hover:bg-green-50"
                 }`}
               >
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/png,image/jpeg,image/jpg"
-                  onChange={handleFileChange}
-                  className="hidden"
-                />
-
                 <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-2xl bg-white text-4xl shadow-md">
                   📷
                 </div>
@@ -237,6 +289,10 @@ export default function Home() {
 
                 <button
                   type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    openFilePicker();
+                  }}
                   className="mt-6 rounded-xl bg-green-600 px-6 py-3 font-semibold text-white transition hover:bg-green-700"
                 >
                   Choose Image
@@ -249,6 +305,7 @@ export default function Home() {
             ) : (
               <div className="rounded-3xl border border-green-100 bg-green-50/50 p-6 md:p-8">
                 <div className="grid gap-8 md:grid-cols-2">
+                  {/* Preview */}
                   <div className="overflow-hidden rounded-2xl bg-slate-100">
                     <img
                       src={preview}
@@ -257,6 +314,7 @@ export default function Home() {
                     />
                   </div>
 
+                  {/* Image Information */}
                   <div className="flex flex-col justify-center">
                     <span className="text-sm font-semibold text-green-600">
                       IMAGE READY
@@ -268,33 +326,37 @@ export default function Home() {
 
                     <p className="mt-2 text-sm text-slate-500">
                       {selectedImage
-                        ? `${(selectedImage.size / 1024 / 1024).toFixed(2)} MB`
+                        ? `${(selectedImage.size / 1024 / 1024).toFixed(
+                            2
+                          )} MB`
                         : ""}
                     </p>
 
                     <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+                      {/* Change Image */}
                       <button
-                        onClick={() => fileInputRef.current?.click()}
-                        className="rounded-xl border border-green-200 bg-white px-5 py-3 font-semibold text-green-700 hover:bg-green-50"
+                        type="button"
+                        onClick={openFilePicker}
+                        className="rounded-xl border border-green-200 bg-white px-5 py-3 font-semibold text-green-700 transition hover:bg-green-50"
                       >
                         Change Image
                       </button>
 
+                      {/* Analyze */}
                       <button
-                        onClick={() => {
-                          alert(
-                            "Image is ready. Backend API integration will be added in the next integration sprint."
-                          );
-                        }}
-                        className="rounded-xl bg-green-600 px-5 py-3 font-semibold text-white hover:bg-green-700"
+                        type="button"
+                        onClick={handleAnalyze}
+                        className="rounded-xl bg-green-600 px-5 py-3 font-semibold text-white transition hover:bg-green-700"
                       >
                         Analyze Crop →
                       </button>
                     </div>
 
+                    {/* Remove */}
                     <button
+                      type="button"
                       onClick={removeImage}
-                      className="mt-4 text-left text-sm font-medium text-red-500 hover:text-red-600"
+                      className="mt-4 text-left text-sm font-medium text-red-500 transition hover:text-red-600"
                     >
                       Remove image
                     </button>
@@ -303,6 +365,7 @@ export default function Home() {
               </div>
             )}
 
+            {/* Error */}
             {error && (
               <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-600">
                 ⚠ {error}
@@ -312,13 +375,15 @@ export default function Home() {
         </div>
       </section>
 
-      {/* About */}
+      {/* About / Features */}
       <section id="about" className="bg-[#f7faf5] px-6 py-20">
         <div className="mx-auto max-w-7xl">
           <div className="grid gap-8 md:grid-cols-3">
             <div className="rounded-2xl bg-white p-7 shadow-sm">
               <div className="text-3xl">📸</div>
+
               <h3 className="mt-5 text-xl font-bold">Simple Upload</h3>
+
               <p className="mt-2 text-sm leading-6 text-slate-600">
                 Farmers can easily upload crop images through a responsive
                 interface.
@@ -327,16 +392,20 @@ export default function Home() {
 
             <div className="rounded-2xl bg-white p-7 shadow-sm">
               <div className="text-3xl">🤖</div>
+
               <h3 className="mt-5 text-xl font-bold">AI Detection</h3>
+
               <p className="mt-2 text-sm leading-6 text-slate-600">
-                Uploaded images can later be sent to the project's AI model
-                for disease detection.
+                Uploaded images can later be sent to the project&apos;s AI
+                model for disease detection.
               </p>
             </div>
 
             <div className="rounded-2xl bg-white p-7 shadow-sm">
               <div className="text-3xl">🌱</div>
+
               <h3 className="mt-5 text-xl font-bold">Crop Care</h3>
+
               <p className="mt-2 text-sm leading-6 text-slate-600">
                 The platform is designed to help farmers make better crop-care
                 decisions.
@@ -350,6 +419,7 @@ export default function Home() {
       <footer className="border-t border-green-100 bg-white px-6 py-8">
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 text-sm text-slate-500 md:flex-row">
           <p>© 2026 Crop Care Crop. Academic Project.</p>
+
           <p>AI-powered crop disease detection</p>
         </div>
       </footer>
