@@ -7,26 +7,35 @@ export default function Home() {
   const [preview, setPreview] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [isDragging, setIsDragging] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Validate and select crop image
   const validateAndSetImage = (file: File) => {
     setError("");
 
     const allowedTypes = ["image/jpeg", "image/jpg", "image/png"];
+    const maxFileSize = 10 * 1024 * 1024;
 
     if (!allowedTypes.includes(file.type)) {
-      setError("Please upload a JPG, JPEG, or PNG image.");
+      setError(
+        "Unsupported file type. Please choose a JPG, JPEG, or PNG image."
+      );
       return;
     }
 
-    if (file.size > 10 * 1024 * 1024) {
-      setError("Image size must be less than 10 MB.");
+    if (file.size > maxFileSize) {
+      setError(
+        "Image is too large. Please choose an image smaller than 10 MB."
+      );
       return;
     }
 
     setSelectedImage(file);
 
     const imageUrl = URL.createObjectURL(file);
+
     setPreview((oldPreview) => {
       if (oldPreview) {
         URL.revokeObjectURL(oldPreview);
@@ -36,6 +45,7 @@ export default function Home() {
     });
   };
 
+  // Handle normal file selection
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
 
@@ -43,10 +53,11 @@ export default function Home() {
       validateAndSetImage(file);
     }
 
-    // Allows selecting the same file again after changing/removing it.
+    // Allows selecting the same file again
     event.target.value = "";
   };
 
+  // Handle drag and drop
   const handleDrop = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
     setIsDragging(false);
@@ -58,6 +69,7 @@ export default function Home() {
     }
   };
 
+  // Remove selected image
   const removeImage = () => {
     setSelectedImage(null);
 
@@ -70,32 +82,40 @@ export default function Home() {
     });
 
     setError("");
+    setIsAnalyzing(false);
 
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
   };
 
+  // Open file picker
   const openFilePicker = () => {
     fileInputRef.current?.click();
   };
 
+  // Analyze image
   const handleAnalyze = () => {
     if (!selectedImage) {
       setError("Please select a crop image first.");
       return;
     }
 
-    alert(
-      "Image is ready for analysis. Backend API integration will be added during the frontend-backend integration sprint."
-    );
+    setError("");
+    setIsAnalyzing(true);
+
+    setTimeout(() => {
+      setIsAnalyzing(false);
+
+      alert(
+        "Image is ready for analysis. Backend API integration will be added during the frontend-backend integration sprint."
+      );
+    }, 1500);
   };
 
   return (
     <main className="min-h-screen bg-[#f7faf5] text-slate-900">
-      {/* Global hidden file input.
-          It stays mounted even after an image is selected,
-          so Change Image continues to work. */}
+      {/* Global hidden file input */}
       <input
         ref={fileInputRef}
         type="file"
@@ -215,7 +235,6 @@ export default function Home() {
             <div className="mt-6 grid grid-cols-3 gap-3 text-center">
               <div className="rounded-xl bg-slate-50 p-3">
                 <div className="text-xl">📷</div>
-
                 <p className="mt-1 text-xs font-medium text-slate-600">
                   Upload
                 </p>
@@ -223,7 +242,6 @@ export default function Home() {
 
               <div className="rounded-xl bg-slate-50 p-3">
                 <div className="text-xl">🤖</div>
-
                 <p className="mt-1 text-xs font-medium text-slate-600">
                   Analyze
                 </p>
@@ -231,7 +249,6 @@ export default function Home() {
 
               <div className="rounded-xl bg-slate-50 p-3">
                 <div className="text-xl">💡</div>
-
                 <p className="mt-1 text-xs font-medium text-slate-600">
                   Insights
                 </p>
@@ -337,7 +354,8 @@ export default function Home() {
                       <button
                         type="button"
                         onClick={openFilePicker}
-                        className="rounded-xl border border-green-200 bg-white px-5 py-3 font-semibold text-green-700 transition hover:bg-green-50"
+                        disabled={isAnalyzing}
+                        className="rounded-xl border border-green-200 bg-white px-5 py-3 font-semibold text-green-700 transition hover:bg-green-50 disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         Change Image
                       </button>
@@ -346,9 +364,10 @@ export default function Home() {
                       <button
                         type="button"
                         onClick={handleAnalyze}
-                        className="rounded-xl bg-green-600 px-5 py-3 font-semibold text-white transition hover:bg-green-700"
+                        disabled={isAnalyzing}
+                        className="rounded-xl bg-green-600 px-5 py-3 font-semibold text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-70"
                       >
-                        Analyze Crop →
+                        {isAnalyzing ? "Analyzing Image..." : "Analyze Crop →"}
                       </button>
                     </div>
 
@@ -356,7 +375,8 @@ export default function Home() {
                     <button
                       type="button"
                       onClick={removeImage}
-                      className="mt-4 text-left text-sm font-medium text-red-500 transition hover:text-red-600"
+                      disabled={isAnalyzing}
+                      className="mt-4 text-left text-sm font-medium text-red-500 transition hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       Remove image
                     </button>
@@ -365,10 +385,11 @@ export default function Home() {
               </div>
             )}
 
-            {/* Error */}
+            {/* Error Message */}
             {error && (
-              <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-600">
-                ⚠ {error}
+              <div className="mt-4 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-600">
+                <span>⚠</span>
+                <span>{error}</span>
               </div>
             )}
           </div>
