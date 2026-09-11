@@ -327,7 +327,7 @@ export default function Home() {
                     <img
                       src={preview}
                       alt="Selected crop"
-                      className="h-80 w-full object-cover"
+                      className="h-56 w-full object-cover sm:h-72 md:h-80"
                     />
                   </div>
 
