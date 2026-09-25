@@ -1,0 +1,1 @@
+"""Small reusable helpers with no dependency on other application layers."""
