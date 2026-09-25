@@ -1,5 +1,4 @@
-"""ML layer: model artifacts loading and inference.
+"""ML layer: the ONLY package that will import torch / YOLO / OpenCV.
 
-Framework-specific code (PyTorch, YOLO, OpenCV) lives ONLY in this package.
-Routes and services depend on `CropDiseasePredictor`, never on torch.
+Routes and services depend on `CropDiseasePredictor`, never on a framework.
 """

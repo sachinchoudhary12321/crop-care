@@ -1,1 +1,1 @@
-"""HTTP API layer: routers and dependency injection wiring."""
+"""HTTP API layer: routers and dependency wiring."""

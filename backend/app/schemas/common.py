@@ -9,12 +9,14 @@ from pydantic import BaseModel, Field
 class ErrorDetail(BaseModel):
     """Machine-readable error information."""
 
-    code: str = Field(..., description="Stable error code", examples=["model_not_available"])
+    code: str = Field(..., description="Stable error code.", examples=["INVALID_IMAGE"])
     message: str = Field(
-        ..., description="Human-readable explanation", examples=["The ML model is not available."]
+        ..., description="Human-readable explanation.",
+        examples=["Uploaded file is not a supported image."],
     )
     details: Any | None = Field(
-        default=None, description="Optional extra context (e.g. validation errors)"
+        default=None,
+        description="Optional extra context (e.g. field-level validation errors).",
     )
 
 

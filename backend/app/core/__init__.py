@@ -1,1 +1,1 @@
-"""Cross-cutting concerns: configuration, logging, errors, security, middleware."""
+"""Cross-cutting concerns: configuration, logging, errors, middleware."""

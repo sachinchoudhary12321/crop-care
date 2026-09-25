@@ -1,70 +1,53 @@
-"""Crop disease inference — the stable ML interface.
+"""Crop disease inference seam (ML Integration task).
 
-The rest of the backend only depends on `CropDiseasePredictor.predict()` and
-`warm_up()`. When the real model is integrated, only `_run_inference()` (and
-`ModelLoader.load()`) change — no route, service or schema needs to move.
+Current behaviour: `predict()` raises ModelNotAvailableError — the backend
+NEVER produces fake predictions. When the trained model exists, only this
+file (and a worker that calls PredictionService.process_prediction) changes.
 """
 from __future__ import annotations
 
 import logging
-from typing import Any
+from dataclasses import dataclass
 
 from app.core.exceptions import ModelNotAvailableError
-from app.ml.model_loader import ModelLoader
-from app.schemas.prediction import PredictionResult
 
 logger = logging.getLogger(__name__)
 
 
+@dataclass(frozen=True)
+class PredictionResult:
+    """Output of a successful inference (produced only by the real model)."""
+
+    crop: str
+    disease: str
+    confidence: float
+    model_version: str
+
+
 class CropDiseasePredictor:
-    """Runs crop disease detection on a single image."""
-
-    def __init__(self, model_loader: ModelLoader | None = None) -> None:
-        self._loader = model_loader or ModelLoader()
-        self._model: Any | None = None
-
-    @property
-    def is_ready(self) -> bool:
-        """True once a model has actually been loaded into memory."""
-        return self._model is not None
+    """Inference interface used by the prediction service."""
 
     def warm_up(self) -> None:
-        """Load the model ahead of the first request (best effort).
+        """Called once at application startup.
 
-        Called during application startup. When no trained artifact is
-        available yet (current state), a warning is logged and the service
-        keeps running — prediction requests answer HTTP 503 instead.
+        TODO(ML Integration task): load the trained artifact here
+        (e.g. torch.load / YOLO weights) so the first request is not slowed
+        down. Log a warning instead of crashing when no artifact exists.
         """
-        try:
-            self._ensure_loaded()
-            logger.info("Crop disease model loaded and ready.")
-        except ModelNotAvailableError as exc:
-            logger.warning("Crop disease model is not available yet: %s", exc)
+        logger.info("ML integration pending: predictor is running in stub mode.")
 
     def predict(self, image_bytes: bytes) -> PredictionResult:
-        """Predict the disease for one image.
+        """Run disease detection on raw image bytes.
 
-        Synchronous and CPU-bound by design: `PredictionService` calls it in
-        a worker thread so the event loop is never blocked.
-        """
-        self._ensure_loaded()
-        return self._run_inference(image_bytes)
+        TODO(ML Integration task), implement exactly here:
+          1. decode + preprocess the image (OpenCV / Pillow: resize, normalise);
+          2. run the model on the configured device (CPU / CUDA);
+          3. map the output to (crop, disease, confidence);
+          4. return PredictionResult(...).
 
-    def _ensure_loaded(self) -> None:
-        if self._model is None:
-            self._model = self._loader.load()
-
-    def _run_inference(self, image_bytes: bytes) -> PredictionResult:
-        """Actual inference — implemented in the ML Integration task.
-
-        Steps to implement (only this method should change):
-          1. Decode + validate the image (OpenCV / Pillow).
-          2. Pre-process (resize, normalise, convert to tensor).
-          3. Run the model (torch / ultralytics YOLO) on the configured device.
-          4. Map the output index to a label from the model's class list.
-          5. Return PredictionResult(label=..., confidence=..., model_version=...).
+        Synchronous and CPU-bound by design: callers execute it in a worker
+        thread (see PredictionService.process_prediction).
         """
         raise ModelNotAvailableError(
-            "Disease prediction is not connected to a trained model yet. "
-            "Implement ModelLoader.load() and CropDiseasePredictor._run_inference()."
+            "Disease prediction is not connected to a trained model yet."
         )

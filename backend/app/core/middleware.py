@@ -12,7 +12,7 @@ logger = logging.getLogger("app.request")
 
 
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
-    """Log method, path, status code and duration of every request."""
+    """Log method, path, status and duration of every request."""
 
     async def dispatch(
         self, request: Request, call_next: RequestResponseEndpoint

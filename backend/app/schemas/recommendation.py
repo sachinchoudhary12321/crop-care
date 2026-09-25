@@ -1,28 +1,45 @@
-"""Schemas for the treatment recommendation API (Recommendation task).
+"""Schemas for the treatment recommendation API.
 
-The contract is intentionally minimal for now; it will grow (risk levels,
-dosage, safety notes, sources) when the recommendation engine is built.
+Contract-only for now: the engine is not implemented, so valid requests get
+HTTP 501. The schemas define the target shape for the future implementation.
 """
 from __future__ import annotations
+
+from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
 
-class TreatmentItem(BaseModel):
-    """A single recommended treatment step."""
+class RecommendationContext(BaseModel):
+    """Optional extra context provided by the client."""
 
-    title: str = Field(..., examples=["Apply copper-based fungicide"])
-    description: str = Field(..., examples=["Spray every 7-10 days until symptoms stop spreading."])
+    location: str | None = Field(default=None, max_length=200)
+    growth_stage: str | None = Field(default=None, max_length=100)
+    notes: str | None = Field(default=None, max_length=500)
 
 
 class RecommendationRequest(BaseModel):
     """Request body for POST /api/v1/recommendations."""
 
-    disease_label: str = Field(..., min_length=1, examples=["Tomato___Late_blight"])
+    crop: str = Field(..., min_length=1, max_length=100, examples=["tomato"])
+    disease: str = Field(..., min_length=1, max_length=200, examples=["late blight"])
+    confidence: float | None = Field(default=None, ge=0.0, le=1.0)
+    context: RecommendationContext | None = None
+
+
+class RecommendationItem(BaseModel):
+    """A single recommended action."""
+
+    category: Literal["treatment", "prevention", "monitoring"]
+    title: str
+    description: str
 
 
 class RecommendationResponse(BaseModel):
-    """Recommended treatments for a detected disease."""
+    """Recommended actions for a detected disease."""
 
-    disease_label: str = Field(..., examples=["Tomato___Late_blight"])
-    treatments: list[TreatmentItem]
+    crop: str
+    disease: str
+    recommendations: list[RecommendationItem]
+    generated_at: datetime

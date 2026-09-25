@@ -1,4 +1,4 @@
-"""Service health endpoints."""
+"""Service health endpoint."""
 from __future__ import annotations
 
 from fastapi import APIRouter
@@ -13,7 +13,7 @@ router = APIRouter(tags=["health"])
     "/health",
     response_model=HealthResponse,
     summary="Service health check",
-    description="Returns basic liveness information. Used by the frontend, CI and monitoring.",
+    description="Liveness probe used by the frontend, CI and monitoring.",
 )
 async def health_check(settings: SettingsDep) -> HealthResponse:
     """Return the liveness payload."""

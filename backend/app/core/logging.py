@@ -1,8 +1,4 @@
-"""Central logging configuration.
-
-Called once from `create_app()`. Every module uses the standard library
-`logging.getLogger(__name__)`, so logs share one format and one destination.
-"""
+"""Central logging configuration (called once from create_app())."""
 from __future__ import annotations
 
 import logging
@@ -13,7 +9,7 @@ _DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 
 def configure_logging(level: str = "INFO") -> None:
-    """Configure the root logger (idempotent — safe to call repeatedly)."""
+    """Configure the root logger (idempotent)."""
     numeric_level = getattr(logging, level.upper(), None)
     if not isinstance(numeric_level, int):
         numeric_level = logging.INFO

@@ -2,9 +2,6 @@
 
 Run locally with:
     uvicorn app.main:app --reload --port 8000
-
-The application is built by `create_app()` (factory pattern) so tests can
-build isolated instances with custom `Settings`.
 """
 from __future__ import annotations
 
@@ -20,43 +17,70 @@ from app.core.config import Settings, get_settings
 from app.core.exceptions import register_exception_handlers
 from app.core.logging import configure_logging
 from app.core.middleware import RequestLoggingMiddleware
-from app.database.connection import dispose_engine
-from app.ml.model_loader import ModelLoader
 from app.ml.predictor import CropDiseasePredictor
+from app.repositories.disease_repository import InMemoryDiseaseRepository
+from app.repositories.prediction_repository import InMemoryPredictionRepository
+from app.services.disease_service import DiseaseService
+from app.services.prediction_service import PredictionService
+from app.services.recommendation_service import RecommendationService
+from app.storage.image_storage import ImageStorage
 
 logger = logging.getLogger(__name__)
+
+_OPENAPI_TAGS = [
+    {"name": "health", "description": "Service liveness."},
+    {
+        "name": "predictions",
+        "description": "Upload crop images and track prediction requests.",
+    },
+    {"name": "diseases", "description": "Disease information catalogue."},
+    {
+        "name": "recommendations",
+        "description": "Treatment recommendations (API contract; engine not connected yet).",
+    },
+]
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    """Application startup / shutdown logic (replaces deprecated on_event)."""
+    """Startup / shutdown logic (replaces deprecated on_event hooks)."""
     settings: Settings = app.state.settings
+    storage: ImageStorage = app.state.storage
+
+    # Make sure the upload directory exists before the first request.
+    storage.ensure_ready()
+
+    # Best effort: no trained model exists yet, so this only logs.
+    app.state.predictor.warm_up()
 
     logger.info(
-        "Starting %s v%s (environment=%s)",
+        "Starting %s v%s (environment=%s, upload_dir=%s)",
         settings.app_name,
         settings.app_version,
         settings.environment,
+        settings.upload_dir,
     )
-
-    # ML: load the model once per process. Best effort — when no trained
-    # artifact is available yet (current state) a warning is logged and the
-    # API keeps running; prediction requests answer with HTTP 503 instead.
-    app.state.predictor.warm_up()
-
-    # TODO(Database Integration task): verify database connectivity here.
-
     yield
-
-    # Release shared resources. No-op until the DB engine is actually created.
-    await dispose_engine()
     logger.info("%s stopped.", settings.app_name)
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
-    """Create and configure the FastAPI application."""
+    """Build and configure the FastAPI application (factory pattern)."""
     settings = settings or get_settings()
     configure_logging(settings.log_level)
+
+    # --- Shared, process-wide objects (one instance per app) --------------
+    # TEMPORARY data layer: in-memory repositories, swapped for SQLAlchemy
+    # implementations in the Database Integration task. Nothing outside
+    # `app/repositories/` needs to change when that happens.
+    storage = ImageStorage(settings.upload_dir)
+    predictor = CropDiseasePredictor()
+    prediction_service = PredictionService(
+        repository=InMemoryPredictionRepository(),
+        storage=storage,
+        predictor=predictor,
+    )
+    disease_service = DiseaseService(repository=InMemoryDiseaseRepository())
 
     app = FastAPI(
         title="Crop Care Crop API",
@@ -64,13 +88,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         version=settings.app_version,
         debug=settings.debug,
         lifespan=lifespan,
+        openapi_tags=_OPENAPI_TAGS,
     )
 
-    # Long-lived, process-wide objects live on app.state.
+    # Exposed to dependencies (app/api/deps.py) via request.app.state.
     app.state.settings = settings
-    app.state.predictor = CropDiseasePredictor(model_loader=ModelLoader(settings))
+    app.state.storage = storage
+    app.state.predictor = predictor
+    app.state.prediction_service = prediction_service
+    app.state.disease_service = disease_service
+    app.state.recommendation_service = RecommendationService()
 
-    # Middleware — the LAST one added runs FIRST (outermost).
+    # Middleware — LAST added runs FIRST (outermost).
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origin_list,
@@ -89,7 +118,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 app = create_app()
 
 
-if __name__ == "__main__":  # convenience for `python -m app.main`
+if __name__ == "__main__":  # `python -m app.main`
     import uvicorn
 
     uvicorn.run("app.main:app", host="127.0.0.1", port=8000, reload=True)

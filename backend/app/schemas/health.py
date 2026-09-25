@@ -10,4 +10,4 @@ class HealthResponse(BaseModel):
     """Liveness payload returned by GET /api/v1/health."""
 
     status: Literal["ok"] = "ok"
-    service: str = Field(..., description="Service name", examples=["crop-care-backend"])
+    service: str = Field(..., examples=["crop-care-backend"])

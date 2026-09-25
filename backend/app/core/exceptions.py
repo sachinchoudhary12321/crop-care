@@ -1,12 +1,9 @@
 """Application error types and global FastAPI exception handlers.
 
-Every deliberate failure in the backend raises an `AppError` subclass from
-any layer (service, ML, database). `register_exception_handlers` maps them to
-a uniform JSON envelope:
+Every deliberate failure raises an `AppError` subclass; the handlers below
+map them to ONE uniform JSON envelope so the frontend only needs one parser:
 
-    {"error": {"code": "...", "message": "...", "details": ...}}
-
-so clients (the React/Next.js frontend) only ever need one error parser.
+    {"error": {"code": "INVALID_IMAGE", "message": "...", "details": null}}
 """
 from __future__ import annotations
 
@@ -22,11 +19,16 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 logger = logging.getLogger(__name__)
 
 
+# ---------------------------------------------------------------------------
+# Error types
+# ---------------------------------------------------------------------------
+
+
 class AppError(Exception):
     """Base class for errors the application raises deliberately."""
 
     status_code: int = status.HTTP_500_INTERNAL_SERVER_ERROR
-    error_code: str = "internal_error"
+    code: str = "INTERNAL_ERROR"
     default_message: str = "An unexpected error occurred."
 
     def __init__(self, message: str | None = None) -> None:
@@ -35,47 +37,62 @@ class AppError(Exception):
 
 
 class InvalidImageError(AppError):
-    """The uploaded file is not a supported image."""
-
     status_code = status.HTTP_415_UNSUPPORTED_MEDIA_TYPE
-    error_code = "invalid_image"
-    default_message = "The uploaded file is not a supported image."
+    code = "INVALID_IMAGE"
+    default_message = "Uploaded file is not a supported image."
 
 
-class ImageTooLargeError(AppError):
-    """The uploaded image exceeds the configured size limit."""
-
+class FileTooLargeError(AppError):
     status_code = status.HTTP_413_REQUEST_ENTITY_TOO_LARGE
-    error_code = "image_too_large"
-    default_message = "The uploaded image is too large."
+    code = "FILE_TOO_LARGE"
+    default_message = "The uploaded file is too large."
+
+
+class StorageError(AppError):
+    status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+    code = "STORAGE_ERROR"
+    default_message = "The image could not be stored."  # never include paths
+
+
+class PredictionNotFoundError(AppError):
+    status_code = status.HTTP_404_NOT_FOUND
+    code = "PREDICTION_NOT_FOUND"
+    default_message = "The requested prediction does not exist."
+
+
+class DiseaseNotFoundError(AppError):
+    status_code = status.HTTP_404_NOT_FOUND
+    code = "DISEASE_NOT_FOUND"
+    default_message = "The requested disease is not in the catalogue."
 
 
 class ModelNotAvailableError(AppError):
-    """The ML model is missing or not integrated yet."""
-
     status_code = status.HTTP_503_SERVICE_UNAVAILABLE
-    error_code = "model_not_available"
-    default_message = "The ML model is not available."
-
-
-class DatabaseNotConfiguredError(AppError):
-    """The database layer was used before being configured."""
-
-    status_code = status.HTTP_503_SERVICE_UNAVAILABLE
-    error_code = "database_not_configured"
-    default_message = "The database is not configured."
+    code = "MODEL_NOT_AVAILABLE"
+    default_message = "The ML model is not available yet."
 
 
 class FeatureNotImplementedError(AppError):
-    """A planned feature (recommendation, chatbot, ...) is not built yet."""
-
     status_code = status.HTTP_501_NOT_IMPLEMENTED
-    error_code = "not_implemented"
+    code = "NOT_IMPLEMENTED"
     default_message = "This feature is not implemented yet."
 
 
+# ---------------------------------------------------------------------------
+# Helpers / handlers
+# ---------------------------------------------------------------------------
+
+_HTTP_CODE_MAP = {
+    400: "BAD_REQUEST",
+    401: "UNAUTHORIZED",
+    403: "FORBIDDEN",
+    404: "NOT_FOUND",
+    405: "METHOD_NOT_ALLOWED",
+    409: "CONFLICT",
+}
+
+
 def _error_payload(code: str, message: str, details: Any = None) -> dict[str, Any]:
-    """Build the uniform error envelope."""
     payload: dict[str, Any] = {"error": {"code": code, "message": message}}
     if details is not None:
         payload["error"]["details"] = details
@@ -83,20 +100,16 @@ def _error_payload(code: str, message: str, details: Any = None) -> dict[str, An
 
 
 def register_exception_handlers(app: FastAPI) -> None:
-    """Attach global exception handlers to the application."""
+    """Attach the global exception handlers to the application."""
 
     @app.exception_handler(AppError)
     async def handle_app_error(request: Request, exc: AppError) -> JSONResponse:
         logger.warning(
-            "%s %s -> %s (%s)",
-            request.method,
-            request.url.path,
-            exc.status_code,
-            exc.error_code,
+            "%s %s -> %s (%s)", request.method, request.url.path, exc.status_code, exc.code
         )
         return JSONResponse(
             status_code=exc.status_code,
-            content=_error_payload(exc.error_code, exc.message),
+            content=_error_payload(exc.code, exc.message),
         )
 
     @app.exception_handler(RequestValidationError)
@@ -106,7 +119,7 @@ def register_exception_handlers(app: FastAPI) -> None:
         return JSONResponse(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             content=_error_payload(
-                "validation_error",
+                "VALIDATION_ERROR",
                 "Request validation failed.",
                 jsonable_encoder(exc.errors()),
             ),
@@ -117,9 +130,10 @@ def register_exception_handlers(app: FastAPI) -> None:
         request: Request, exc: StarletteHTTPException
     ) -> JSONResponse:
         message = exc.detail if isinstance(exc.detail, str) else "Request failed."
+        code = _HTTP_CODE_MAP.get(exc.status_code, "HTTP_ERROR")
         return JSONResponse(
             status_code=exc.status_code,
-            content=_error_payload("http_error", message),
+            content=_error_payload(code, message),
         )
 
     @app.exception_handler(Exception)
@@ -127,5 +141,5 @@ def register_exception_handlers(app: FastAPI) -> None:
         logger.exception("Unhandled exception on %s %s", request.method, request.url.path)
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            content=_error_payload("internal_error", "Internal server error."),
+            content=_error_payload("INTERNAL_ERROR", "Internal server error."),
         )
