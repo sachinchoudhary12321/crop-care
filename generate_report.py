@@ -1,4 +1,4 @@
-﻿import subprocess
+import subprocess
 from collections import defaultdict
 import datetime
 import io
@@ -84,8 +84,8 @@ def get_git_metrics(interval="weekly"):
             else:
                 continue
 
-            # --- IGNORE AUTOMATED BOTS ---
-            if "bot" in author.lower() or "github-actions" in author.lower():
+            # --- IGNORE AUTOMATED BOTS & NON-TEAM MEMBERS ---
+            if "bot" in author.lower() or "github-actions" in author.lower() or "pranjal" in author.lower():
                 current_author = None
                 continue
             # -----------------------------
